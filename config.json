@@ -2,10 +2,10 @@
   "notificar_siempre": false,
   "alertas": [
     {
-      "id": "btc_arriba_70000",
+      "id": "btc_arriba_63000",
       "symbol": "BTCUSDT",
       "condicion": "arriba",
-      "precio": 70000,
+      "precio": 63000,
       "activa": true
     },
     {
