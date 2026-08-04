@@ -1,0 +1,19 @@
+{
+  "notificar_siempre": false,
+  "alertas": [
+    {
+      "id": "btc_arriba_70000",
+      "symbol": "BTCUSDT",
+      "condicion": "arriba",
+      "precio": 70000,
+      "activa": true
+    },
+    {
+      "id": "btc_abajo_60000",
+      "symbol": "BTCUSDT",
+      "condicion": "abajo",
+      "precio": 60000,
+      "activa": true
+    }
+  ]
+}
