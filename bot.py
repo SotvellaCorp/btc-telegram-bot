@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Revisa precios en Binance y notifica por Telegram.
+Revisa precios de criptomonedas (via CoinGecko) y notifica por Telegram.
 Diseñado para ejecutarse UNA VEZ por corrida (ideal para GitHub Actions
 con `schedule`), no como proceso en loop.
 
@@ -36,11 +36,34 @@ def guardar_json(path: str, data: dict):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+# CoinGecko no usa símbolos estilo Binance (ej. "BTCUSDT"), usa un "id"
+# propio por moneda. Este mapeo permite seguir usando los mismos symbols
+# en config.json sin tener que cambiar nada ahí.
+SYMBOL_TO_COINGECKO_ID = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "SOLUSDT": "solana",
+    "BNBUSDT": "binancecoin",
+    "XRPUSDT": "ripple",
+    "ADAUSDT": "cardano",
+    "DOGEUSDT": "dogecoin",
+}
+
+
 def obtener_precio(symbol: str) -> float:
-    url = "https://api.binance.com/api/v3/ticker/price"
-    resp = requests.get(url, params={"symbol": symbol}, timeout=10)
+    coingecko_id = SYMBOL_TO_COINGECKO_ID.get(symbol.upper())
+    if not coingecko_id:
+        raise ValueError(
+            f"No conozco el id de CoinGecko para '{symbol}'. "
+            f"Agrégalo a SYMBOL_TO_COINGECKO_ID en bot.py "
+            f"(busca el id correcto en https://api.coingecko.com/api/v3/coins/list)."
+        )
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    resp = requests.get(
+        url, params={"ids": coingecko_id, "vs_currencies": "usd"}, timeout=10
+    )
     resp.raise_for_status()
-    return float(resp.json()["price"])
+    return float(resp.json()[coingecko_id]["usd"])
 
 
 def enviar_telegram(mensaje: str):
@@ -64,7 +87,7 @@ def main():
     ahora = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # Cache de precios ya consultados en esta corrida (por si hay varias
-    # alertas con el mismo symbol, no pedirlo a Binance más de una vez)
+    # alertas con el mismo symbol, no pedirlo a CoinGecko más de una vez)
     precios_cache = {}
 
     def get_precio_cached(symbol):
