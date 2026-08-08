@@ -1,7 +1,12 @@
 # BTC Telegram Bot (GitHub Actions)
 
-Revisa el precio de BTC (u otras monedas) en Binance cada 5 minutos usando
+Revisa el precio de BTC (u otras monedas) en CoinGecko cada 5 minutos usando
 GitHub Actions, y avisa por Telegram cuando se cumple una condición.
+
+> **Nota:** este bot usaba antes la API de Binance, pero Binance bloquea
+> las conexiones desde IPs de Estados Unidos (incluyendo los servidores de
+> GitHub Actions). Por eso ahora usa la API pública de CoinGecko, que no
+> tiene ese bloqueo.
 
 ## 1. Crear el repositorio
 
@@ -44,7 +49,12 @@ Ahí defines qué quieres monitorear, sin tocar el código:
 }
 ```
 
-- `symbol`: cualquier par válido de Binance (`BTCUSDT`, `ETHUSDT`, `SOLUSDT`, etc.)
+- `symbol`: uno de los símbolos que el bot ya reconoce: `BTCUSDT`, `ETHUSDT`,
+  `SOLUSDT`, `BNBUSDT`, `XRPUSDT`, `ADAUSDT`, `DOGEUSDT`. Internamente el
+  bot traduce esto a un "id" de CoinGecko (ej. `BTCUSDT` → `bitcoin`). Si
+  quieres agregar otra moneda que no esté en la lista, hay que agregarla
+  al diccionario `SYMBOL_TO_COINGECKO_ID` en `bot.py` (el id correcto se
+  busca en https://api.coingecko.com/api/v3/coins/list).
 - `condicion`: `"arriba"` o `"abajo"`
 - `precio`: el umbral que dispara la alerta
 - `activa`: pon `false` para desactivar una alerta sin borrarla
@@ -74,6 +84,6 @@ el workflow actualiza con un commit automático después de cada corrida.
 
 - Agregar más monedas (solo agrega alertas con otro `symbol`)
 - Cambiar el mensaje para incluir % de variación en 24h
-  (Binance endpoint `/api/v3/ticker/24hr`)
+  (CoinGecko soporta esto agregando `include_24hr_change=true` al request)
 - Enviar un resumen diario en vez de solo alertas puntuales
 - Agregar alertas por volumen o variación porcentual repentina
