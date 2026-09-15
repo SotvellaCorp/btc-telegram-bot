@@ -9,7 +9,7 @@
       "activa": true
     },
     {
-      "id": "btc_abajo_70000",
+      "id": "btc_abajo_63000",
       "symbol": "BTCUSDT",
       "condicion": "abajo",
       "precio": 60000,
