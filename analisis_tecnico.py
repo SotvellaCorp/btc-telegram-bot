@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import requests
 
-BINANCE_URL = "https://api.binance.com/api/v3/klines"
+BINANCE_URL = "https://api-gcp.binance.com/api/v3/klines"
 SYMBOL = "BTCUSDT"
 INTERVAL = "1h"
 LIMIT = 120
