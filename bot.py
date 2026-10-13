@@ -1,21 +1,16 @@
+
 #!/usr/bin/env python3
 """
-Revisa precios de criptomonedas (via CoinGecko) y notifica por Telegram.
-Diseñado para ejecutarse UNA VEZ por corrida (ideal para GitHub Actions
-con `schedule`), no como proceso en loop.
-
-Configuración de alertas: config.json (editable sin tocar código).
-Credenciales: variables de entorno TELEGRAM_TOKEN y TELEGRAM_CHAT_ID
-              (en GitHub Actions vienen de los Secrets del repo).
-Estado (para no repetir avisos): state.json, se actualiza cada corrida.
+Bot de alertas de precio y análisis técnico BTC/USDT.
+Se ejecuta una vez por corrida de GitHub Actions.
 """
-
 import json
 import os
 import sys
 from datetime import datetime, timezone
 
 import requests
+from analisis_tecnico import analizar_tendencia, formatear_informe
 
 CONFIG_PATH = "config.json"
 STATE_PATH = "state.json"
@@ -23,22 +18,6 @@ STATE_PATH = "state.json"
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-
-def cargar_json(path: str, default: dict) -> dict:
-    if not os.path.exists(path):
-        return default
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def guardar_json(path: str, data: dict):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
-# CoinGecko no usa símbolos estilo Binance (ej. "BTCUSDT"), usa un "id"
-# propio por moneda. Este mapeo permite seguir usando los mismos symbols
-# en config.json sin tener que cambiar nada ahí.
 SYMBOL_TO_COINGECKO_ID = {
     "BTCUSDT": "bitcoin",
     "ETHUSDT": "ethereum",
@@ -50,97 +29,140 @@ SYMBOL_TO_COINGECKO_ID = {
 }
 
 
-def obtener_precio(symbol: str) -> float:
-    coingecko_id = SYMBOL_TO_COINGECKO_ID.get(symbol.upper())
-    if not coingecko_id:
-        raise ValueError(
-            f"No conozco el id de CoinGecko para '{symbol}'. "
-            f"Agrégalo a SYMBOL_TO_COINGECKO_ID en bot.py "
-            f"(busca el id correcto en https://api.coingecko.com/api/v3/coins/list)."
-        )
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    resp = requests.get(
-        url, params={"ids": coingecko_id, "vs_currencies": "usd"}, timeout=10
+def cargar_json(path, default):
+    if not os.path.exists(path):
+        return default
+    with open(path, "r", encoding="utf-8") as archivo:
+        return json.load(archivo)
+
+
+def guardar_json(path, data):
+    with open(path, "w", encoding="utf-8") as archivo:
+        json.dump(data, archivo, indent=2, ensure_ascii=False)
+
+
+def obtener_precio(symbol):
+    coin_id = SYMBOL_TO_COINGECKO_ID.get(symbol.upper())
+    if not coin_id:
+        raise ValueError(f"Símbolo no configurado en CoinGecko: {symbol}")
+
+    respuesta = requests.get(
+        "https://api.coingecko.com/api/v3/simple/price",
+        params={"ids": coin_id, "vs_currencies": "usd"},
+        timeout=10,
     )
-    resp.raise_for_status()
-    return float(resp.json()[coingecko_id]["usd"])
+    respuesta.raise_for_status()
+    return float(respuesta.json()[coin_id]["usd"])
 
 
-def enviar_telegram(mensaje: str):
+def enviar_telegram(mensaje):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("[ERROR] Falta TELEGRAM_TOKEN o TELEGRAM_CHAT_ID en las variables de entorno.")
-        return
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    resp = requests.post(
-        url, data={"chat_id": TELEGRAM_CHAT_ID, "text": mensaje}, timeout=10
+        print("[ERROR] Faltan TELEGRAM_TOKEN o TELEGRAM_CHAT_ID.")
+        return False
+
+    respuesta = requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        data={"chat_id": TELEGRAM_CHAT_ID, "text": mensaje},
+        timeout=15,
     )
-    if resp.status_code != 200:
-        print(f"[ERROR] No se pudo enviar el mensaje: {resp.text}")
-    else:
-        print(f"[OK] Mensaje enviado: {mensaje!r}")
+
+    if respuesta.status_code != 200:
+        print(f"[ERROR] Telegram respondió HTTP {respuesta.status_code}: {respuesta.text}")
+        return False
+
+    print("[OK] Mensaje enviado a Telegram.")
+    return True
 
 
 def main():
-    config = cargar_json(CONFIG_PATH, {"notificar_siempre": False, "alertas": []})
-    state = cargar_json(STATE_PATH, {})
-
+    config = cargar_json(
+        CONFIG_PATH,
+        {"notificar_siempre": False, "alertas": [], "analisis_tecnico": True},
+    )
+    estado = cargar_json(STATE_PATH, {})
     ahora = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-
-    # Cache de precios ya consultados en esta corrida (por si hay varias
-    # alertas con el mismo symbol, no pedirlo a CoinGecko más de una vez)
     precios_cache = {}
 
-    def get_precio_cached(symbol):
+    def precio_cacheado(symbol):
         if symbol not in precios_cache:
             precios_cache[symbol] = obtener_precio(symbol)
         return precios_cache[symbol]
 
-    # --- Notificación "siempre" (precio actual, sin condición) ---
-    if config.get("notificar_siempre"):
-        symbols = {a["symbol"] for a in config.get("alertas", [])} or {"BTCUSDT"}
-        for symbol in symbols:
-            precio = get_precio_cached(symbol)
-            enviar_telegram(f"₿ {symbol}: ${precio:,.2f}\n🕒 {ahora}")
+    # Notificación opcional del precio actual.
+    if config.get("notificar_siempre", False):
+        simbolos = {a["symbol"] for a in config.get("alertas", [])} or {"BTCUSDT"}
+        for symbol in simbolos:
+            try:
+                precio = precio_cacheado(symbol)
+                enviar_telegram(f"₿ {symbol}: ${precio:,.2f}\n🕒 {ahora}")
+            except (requests.exceptions.RequestException, KeyError, ValueError) as error:
+                print(f"[ERROR] Precio de {symbol}: {error}")
 
-    # --- Alertas por umbral ---
+    # Alertas por umbral originales.
     for alerta in config.get("alertas", []):
         if not alerta.get("activa", True):
             continue
 
         alerta_id = alerta["id"]
         symbol = alerta["symbol"]
-        condicion = alerta["condicion"]  # "arriba" o "abajo"
-        umbral = alerta["precio"]
+        condicion = alerta["condicion"]
+        umbral = float(alerta["precio"])
 
-        precio = get_precio_cached(symbol)
-        cruzado = (
-            precio >= umbral if condicion == "arriba" else precio <= umbral
-        )
-        ya_avisado = state.get(alerta_id, False)
+        try:
+            precio = precio_cacheado(symbol)
+        except (requests.exceptions.RequestException, KeyError, ValueError) as error:
+            print(f"[ERROR] No se pudo consultar {symbol}: {error}")
+            continue
+
+        cruzado = precio >= umbral if condicion == "arriba" else precio <= umbral
+        ya_avisado = estado.get(alerta_id, False)
 
         if cruzado and not ya_avisado:
             emoji = "🚀" if condicion == "arriba" else "📉"
             palabra = "superó" if condicion == "arriba" else "cayó por debajo de"
-            enviar_telegram(
+            enviado = enviar_telegram(
                 f"{emoji} ¡{symbol} {palabra} ${umbral:,.2f}!\n"
-                f"Precio actual: ${precio:,.2f}\n"
-                f"🕒 {ahora}"
+                f"Precio actual: ${precio:,.2f}\n🕒 {ahora}"
             )
-            state[alerta_id] = True
+            if enviado:
+                estado[alerta_id] = True
+
         elif not cruzado and ya_avisado:
-            # El precio volvió a cruzar en sentido contrario: reseteamos
-            # para que si vuelve a cruzar el umbral, avise de nuevo.
-            state[alerta_id] = False
+            estado[alerta_id] = False
 
-        print(f"[{alerta_id}] {symbol}={precio} umbral={umbral} "
-              f"condicion={condicion} cruzado={cruzado} ya_avisado={ya_avisado}")
+        print(
+            f"[{alerta_id}] {symbol}={precio} umbral={umbral} "
+            f"condicion={condicion} cruzado={cruzado} ya_avisado={ya_avisado}"
+        )
 
-    guardar_json(STATE_PATH, state)
+    # Análisis técnico: solo un informe por cada nueva vela horaria cerrada.
+    if config.get("analisis_tecnico", True):
+        try:
+            resultado = analizar_tendencia()
+            ultima_vela = resultado["cierre_ms"]
+            vela_previa = estado.get("ultima_vela_analizada_btc_1h")
+
+            if ultima_vela != vela_previa:
+                enviado = enviar_telegram(formatear_informe(resultado))
+                if enviado:
+                    estado["ultima_vela_analizada_btc_1h"] = ultima_vela
+            else:
+                print("[INFO] Esta vela ya fue analizada.")
+
+        except (
+            requests.exceptions.RequestException,
+            ValueError,
+            RuntimeError,
+            KeyError,
+        ) as error:
+            print(f"[ERROR] Falló el análisis técnico: {error}")
+
+    guardar_json(STATE_PATH, estado)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Fallo de conexión: {e}")
+    except requests.exceptions.RequestException as error:
+        print(f"[ERROR] Fallo de conexión: {error}")
         sys.exit(1)
