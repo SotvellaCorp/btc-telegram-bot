@@ -37,6 +37,8 @@ def obtener_velas():
             "low": float(fila[3]),
             "close": float(fila[4]),
             "close_ms": int(fila[6]),
+            "volumen_btc": float(fila[5]),
+            "volumen_usdt": float(fila[7]),
         }
 
         # No utilizar la vela que Binance todavía está formando.
@@ -300,6 +302,20 @@ def analizar_tendencia():
     sma7 = calcular_sma(cierres, 7)
     sma25 = calcular_sma(cierres, 25)
     sma99 = calcular_sma(cierres, 99)
+    volumenes_usdt = [v["volumen_usdt"] for v in velas]
+
+    volumen_actual = volumenes_usdt[-1]
+    ma_volumen5 = calcular_sma(volumenes_usdt, 5)
+    ma_volumen10 = calcular_sma(volumenes_usdt, 10)
+
+   if volumen_actual > ma_volumen5 and ma_volumen5 > ma_volumen10:
+       lectura_volumen = "ACTIVIDAD RECIENTE ELEVADA Y CRECIENTE"
+   elif volumen_actual > ma_volumen5 and volumen_actual > ma_volumen10:
+       lectura_volumen = "VOLUMEN ACTUAL POR ENCIMA DE AMBAS MEDIAS"
+   elif volumen_actual < ma_volumen5 and ma_volumen5 < ma_volumen10:
+      lectura_volumen = "ACTIVIDAD RECIENTE EN DESCENSO"
+   else:
+      lectura_volumen = "VOLUMEN SIN SEÑAL CLARA"
 
     if precio > sma7 > sma25 > sma99:
         senal_medias = 2
@@ -342,6 +358,10 @@ def analizar_tendencia():
         "puntuacion": puntuacion,
         "cierre": cierre,
         "cierre_ms": ultima["close_ms"],
+        "volumen_actual": volumen_actual,
+        "ma_volumen5": ma_volumen5,
+        "ma_volumen10": ma_volumen10,
+        "lectura_volumen": lectura_volumen,
     }
 
 
@@ -359,6 +379,12 @@ def formatear_informe(resultado):
         f"Lectura: {resultado['lectura_medias']}",
         "",
         f"🕯️ Patrones detectados: {len(resultado['patrones'])}",
+        "",
+        "📊 MEDIAS MÓVILES DE VOLUMEN (USDT)",
+        f"Volumen última vela: ${resultado['volumen_actual']:,.2f}",
+        f"MA volumen (5): ${resultado['ma_volumen5']:,.2f}",
+        f"MA volumen (10): ${resultado['ma_volumen10']:,.2f}",
+        f"Lectura: {resultado['lectura_volumen']}",
     ]
 
     if resultado["patrones"]:
