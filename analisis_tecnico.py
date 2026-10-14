@@ -379,12 +379,7 @@ def formatear_informe(resultado):
         f"Lectura: {resultado['lectura_medias']}",
         "",
         f"🕯️ Patrones detectados: {len(resultado['patrones'])}",
-        "",
-        "📊 MEDIAS MÓVILES DE VOLUMEN (USDT)",
-        f"Volumen última vela: ${resultado['volumen_actual']:,.2f}",
-        f"MA volumen (5): ${resultado['ma_volumen5']:,.2f}",
-        f"MA volumen (10): ${resultado['ma_volumen10']:,.2f}",
-        f"Lectura: {resultado['lectura_volumen']}",
+       
     ]
 
     if resultado["patrones"]:
@@ -397,6 +392,12 @@ def formatear_informe(resultado):
         lineas.append("No se detectaron patrones de la lista en la última secuencia.")
 
     lineas.extend([
+         "",
+        "📊 MEDIAS MÓVILES DE VOLUMEN (USDT)",
+        f"Volumen última vela: ${resultado['volumen_actual']:,.2f}",
+        f"MA volumen (5): ${resultado['ma_volumen5']:,.2f}",
+        f"MA volumen (10): ${resultado['ma_volumen10']:,.2f}",
+        f"Lectura: {resultado['lectura_volumen']}",
         "",
         f"Patrones alcistas: {resultado['alcistas']}",
         f"Patrones bajistas: {resultado['bajistas']}",
