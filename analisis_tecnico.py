@@ -308,14 +308,14 @@ def analizar_tendencia():
     ma_volumen5 = calcular_sma(volumenes_usdt, 5)
     ma_volumen10 = calcular_sma(volumenes_usdt, 10)
 
-   if volumen_actual > ma_volumen5 and ma_volumen5 > ma_volumen10:
+    if volumen_actual > ma_volumen5 and ma_volumen5 > ma_volumen10:
        lectura_volumen = "ACTIVIDAD RECIENTE ELEVADA Y CRECIENTE"
-   elif volumen_actual > ma_volumen5 and volumen_actual > ma_volumen10:
+    elif volumen_actual > ma_volumen5 and volumen_actual > ma_volumen10:
        lectura_volumen = "VOLUMEN ACTUAL POR ENCIMA DE AMBAS MEDIAS"
-   elif volumen_actual < ma_volumen5 and ma_volumen5 < ma_volumen10:
-      lectura_volumen = "ACTIVIDAD RECIENTE EN DESCENSO"
-   else:
-      lectura_volumen = "VOLUMEN SIN SEÑAL CLARA"
+    elif volumen_actual < ma_volumen5 and ma_volumen5 < ma_volumen10:
+       lectura_volumen = "ACTIVIDAD RECIENTE EN DESCENSO"
+    else:
+       lectura_volumen = "VOLUMEN SIN SEÑAL CLARA"
 
     if precio > sma7 > sma25 > sma99:
         senal_medias = 2
